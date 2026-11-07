@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlumeErosion: Lunar Lander Engine Plume Regolith Cratering Auditor</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- MathJax v3 (Pre-script configuration) -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <!-- Custom Styles for Theme & Math Cards -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #03050a;
+      color: #e2e8f0;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .formula-box {
+      background-color: #030712;
+      border: 1px solid #1f2937;
+      border-radius: 0.5rem;
+      padding: 0.85rem;
+      margin: 0.75rem 0;
+      color: #38bdf8;
+      overflow-x: auto;
+      text-align: center;
+    }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#03050a] text-slate-200">
+
+  <!-- TOP HEADER HUD -->
+  <header class="border-b border-gray-800 bg-[#080c14]/90 backdrop-blur sticky top-0 z-50 px-4 lg:px-8 py-3">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 rounded-lg bg-cyan-950/80 border border-cyan-500/40 text-cyan-400">
+          <i data-lucide="shield-alert" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              PlumeErosion <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-mono">v4.2-SBIR</span>
+            </h1>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+              PSI AUDITOR ACTIVE
+            </span>
+          </div>
+          <p class="text-xs text-gray-400">Lunar Lander Engine Plume Surface Interaction (PSI) & Dynamic Cratering Auditor</p>
+        </div>
+      </div>
+
+      <!-- Live Global Quick Telemetry Badges -->
+      <div class="flex items-center flex-wrap gap-2 md:gap-4 font-mono text-xs">
+        <div class="bg-gray-900/80 px-3 py-1.5 rounded-md border border-gray-800">
+          <span class="text-gray-400">ALTITUDE:</span>
+          <span id="badgeAlt" class="text-cyan-400 font-bold ml-1">14.2 m</span>
+        </div>
+        <div class="bg-gray-900/80 px-3 py-1.5 rounded-md border border-gray-800">
+          <span class="text-gray-400">CRATER DEPTH:</span>
+          <span id="badgeCrater" class="text-amber-400 font-bold ml-1">0.18 m</span>
+        </div>
+        <div class="bg-gray-900/80 px-3 py-1.5 rounded-md border border-gray-800">
+          <span class="text-gray-400">SCOUR REGIME:</span>
+          <span id="badgeRegime" class="text-emerald-400 font-bold ml-1">DIFFUSE SHEAR</span>
+        </div>
+        <div class="bg-gray-900/80 px-3 py-1.5 rounded-md border border-gray-800">
+          <span class="text-gray-400">BLAST RISK:</span>
+          <span id="badgeRisk" class="text-emerald-400 font-bold ml-1">NOMINAL (12%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="flex space-x-1 mt-3 border-t border-gray-800/60 pt-2 font-medium text-xs md:text-sm">
+      <button id="tabBtnSim" onclick="switchTab('sim')" class="px-4 py-1.5 rounded-md text-cyan-400 bg-cyan-950/40 border border-cyan-800/60 flex items-center gap-1.5 transition">
+        <i data-lucide="activity" class="w-4 h-4"></i> Live Simulation & Phase HUD
+      </button>
+      <button id="tabBtnPhysics" onclick="switchTab('physics')" class="px-4 py-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-800/40 flex items-center gap-1.5 transition">
+        <i data-lucide="book-open" class="w-4 h-4"></i> PSI Physics & Navier-Stokes
+      </button>
+      <button id="tabBtnProposal" onclick="switchTab('proposal')" class="px-4 py-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-800/40 flex items-center gap-1.5 transition">
+        <i data-lucide="file-text" class="w-4 h-4"></i> NASA SBIR Proposal ($225k)
+      </button>
+      <button id="tabBtnARR" onclick="switchTab('arr')" class="px-4 py-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-800/40 flex items-center gap-1.5 transition">
+        <i data-lucide="trending-up" class="w-4 h-4"></i> Civil Commercialization ($218M ARR)
+      </button>
+    </nav>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 p-4 lg:p-6 max-w-[1720px] w-full mx-auto">
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: LIVE SIMULATION & TELEMETRY HUD                                     -->
+    <!-- ========================================================================= -->
+    <div id="viewSim" class="space-y-5">
+      <!-- Top Grid: Interactive Canvas & Phase Diagram -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <!-- Left: Physical Lunar Descent Simulation Canvas (7 cols) -->
+        <div class="lg:col-span-7 bg-gray-900/50 border border-gray-800 rounded-xl p-4 flex flex-col backdrop-blur">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="p-1 rounded bg-cyan-500/10 text-cyan-400"><i data-lucide="radar" class="w-4 h-4"></i></span>
+              <h2 class="text-sm font-semibold tracking-wide uppercase text-gray-200">Plume Stagnation & Regolith Scouring Dynamics</h2>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono">
+              <span class="text-gray-400">Descent Rate:</span>
+              <span id="txtVz" class="text-cyan-300">-1.10 m/s</span>
+              <span class="text-gray-600">|</span>
+              <span class="text-gray-400">Thrust:</span>
+              <span id="txtThrust" class="text-amber-300">22.4 kN</span>
+            </div>
+          </div>
+
+          <!-- Canvas Container -->
+          <div class="relative w-full h-[360px] md:h-[400px] bg-[#020408] rounded-lg overflow-hidden border border-gray-800/80 shadow-inner">
+            <canvas id="simCanvas" class="w-full h-full block"></canvas>
+            
+            <!-- In-Canvas Alert Overlay (HUD) -->
+            <div id="canvasHudOverlay" class="absolute top-3 left-3 bg-gray-950/80 border border-gray-800 rounded px-3 py-2 text-xs font-mono backdrop-blur space-y-1">
+              <div class="text-gray-400 flex items-center justify-between gap-4">
+                <span>STAGNATION PRESS (P₀):</span>
+                <span id="hudP0" class="text-cyan-400 font-bold">14.2 kPa</span>
+              </div>
+              <div class="text-gray-400 flex items-center justify-between gap-4">
+                <span>RADIAL GAS VEL (v_r):</span>
+                <span id="hudVr" class="text-violet-400 font-bold">1,840 m/s</span>
+              </div>
+              <div class="text-gray-400 flex items-center justify-between gap-4">
+                <span>EJECTA FLUX:</span>
+                <span id="hudFlux" class="text-amber-400 font-bold">4.2 kg/m²s</span>
+              </div>
+            </div>
+
+            <!-- Auto-Recovery Alert Banner -->
+            <div id="recoveryBanner" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 bg-rose-950/90 border border-rose-500 text-rose-200 text-xs px-4 py-2 rounded-full font-mono flex items-center gap-2 shadow-lg shadow-rose-950/50 animate-pulse">
+              <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400"></i>
+              <span>BLAST-BACK HAZARD EXCEEDED: AUTONOMOUS CUTOFF & TOUCHDOWN LEGS DEPLOYED</span>
+            </div>
+          </div>
+
+          <!-- Sim Controls Bar -->
+          <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="text-[11px] font-mono text-gray-400 block mb-1">LANDER ALTITUDE (h): <span id="valAlt" class="text-cyan-400">14.0m</span></label>
+              <input type="range" id="sliderAlt" min="1.0" max="35.0" step="0.1" value="14.0" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            </div>
+            <div>
+              <label class="text-[11px] font-mono text-gray-400 block mb-1">ENGINE THROTTLE: <span id="valThrottle" class="text-cyan-400">75%</span></label>
+              <input type="range" id="sliderThrottle" min="20" max="100" step="1" value="75" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            </div>
+            <div>
+              <label class="text-[11px] font-mono text-gray-400 block mb-1">REGOLITH COHESION (c): <span id="valCohesion" class="text-cyan-400">0.8 kPa</span></label>
+              <input type="range" id="sliderCohesion" min="0.1" max="3.0" step="0.1" value="0.8" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            </div>
+            <div>
+              <label class="text-[11px] font-mono text-gray-400 block mb-1">MEAN GRAIN $d_{50}$: <span id="valGrain" class="text-cyan-400">72 µm</span></label>
+              <input type="range" id="sliderGrain" min="20" max="250" step="2" value="72" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            </div>
+          </div>
+
+          <!-- Control Buttons -->
+          <div class="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-800/60">
+            <div class="flex items-center gap-2">
+              <button id="btnAutoDescent" onclick="toggleAutoDescent()" class="px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs flex items-center gap-1.5 transition">
+                <i data-lucide="play" class="w-3.5 h-3.5"></i> <span id="txtAutoDescent">Run Automated Descent</span>
+              </button>
+              <button onclick="injectCrateringFault()" class="px-3 py-1.5 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-mono text-xs flex items-center gap-1.5 transition">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i> Inject Loose Soil / High-Throttle Fault
+              </button>
+            </div>
+            <button onclick="resetSimulation()" class="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 font-mono text-xs flex items-center gap-1 transition">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Primary Phase-Space Chart: Velocity (v) vs Pressure (P) (5 cols) -->
+        <div class="lg:col-span-5 bg-gray-900/50 border border-gray-800 rounded-xl p-4 flex flex-col backdrop-blur">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h2 class="text-sm font-semibold tracking-wide uppercase text-gray-200 flex items-center gap-2">
+                <i data-lucide="compass" class="w-4 h-4 text-violet-400"></i>
+                Phase-Space: Boundary Velocity ($v$) vs Pressure ($P$)
+              </h2>
+              <p class="text-[11px] text-gray-400">Scour & Blast-Back Regimes vs. Real-Time Telemetry State</p>
+            </div>
+            <span class="text-xs font-mono text-violet-400 bg-violet-950/50 border border-violet-800/50 px-2 py-0.5 rounded">
+              $(v, P)$ Space
+            </span>
+          </div>
+
+          <div class="relative flex-1 min-h-[320px] w-full">
+            <canvas id="phaseChart"></canvas>
+          </div>
+
+          <div class="mt-3 p-2.5 bg-gray-950/80 rounded border border-gray-800/80 text-xs font-mono space-y-1">
+            <div class="flex items-center justify-between text-gray-400">
+              <span>CRITICAL SHEAR VELOCITY ($v_{\text{crit}}$):</span>
+              <span id="txtVcrit" class="text-emerald-400 font-bold">1,210 m/s</span>
+            </div>
+            <div class="flex items-center justify-between text-gray-400">
+              <span>BEARING CAPACITY THRESHOLD ($P_{\text{ult}}$):</span>
+              <span id="txtPult" class="text-rose-400 font-bold">38.4 kPa</span>
+            </div>
+            <div class="text-[11px] text-gray-500 pt-1 border-t border-gray-800/50">
+              Zone 1 (Green): Safe Diffuse Boundary | Zone 2 (Amber): Sheet Scouring | Zone 3 (Red): High-Energy Blast-Back
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Grid: Secondary Time-Series Telemetry Charts (2 cols) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Telemetry 1: Real-Time Crater Depth & Gas Scour Rate -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4 backdrop-blur">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold uppercase text-gray-300 flex items-center gap-1.5">
+              <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i> Cratering Depth $h_c(t)$ & Kinetic Soil Ejection Rate
+            </h3>
+            <span class="text-[11px] font-mono text-gray-500">Dual Axis Time Series</span>
+          </div>
+          <div class="relative h-[200px] w-full">
+            <canvas id="chartCraterTime"></canvas>
+          </div>
+        </div>
+
+        <!-- Telemetry 2: Lander Base Kinetic Sandblasting Flux & Leg Stress -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4 backdrop-blur">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold uppercase text-gray-300 flex items-center gap-1.5">
+              <i data-lucide="shield" class="w-4 h-4 text-cyan-400"></i> Baseplate Kinetic Sandblast Energy & Leg Stress
+            </h3>
+            <span class="text-[11px] font-mono text-gray-500">Autonomous Safety Margin</span>
+          </div>
+          <div class="relative h-[200px] w-full">
+            <canvas id="chartSandblastTime"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: CORE PHYSICS & MATHEMATICAL MODEL                                 -->
+    <!-- ========================================================================= -->
+    <div id="viewPhysics" class="hidden space-y-6">
+      
+      <!-- Intro Banner -->
+      <div class="bg-gradient-to-r from-cyan-950/40 via-gray-900/60 to-violet-950/40 border border-cyan-800/40 rounded-xl p-6">
+        <div class="flex items-start gap-4">
+          <div class="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+            <i data-lucide="atom" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-white mb-1">Plume Surface Interaction (PSI) Analytical Mechanics</h2>
+            <p class="text-sm text-gray-300 max-w-4xl">
+              When a lunar descent engine fires near the vacuum surface, compressible supersonic exhaust impinges on cohesionless granular regolith. The resulting flow regime transitions from a supersonic free jet to a normal shock disk, high stagnation pressure zone, and supersonic outward radial wall jet generating shear forces and subsurface pressure gradients.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 Technical Mathematical Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Card 1: Compressible Gas Dynamics & Stagnation Pressure -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 flex flex-col justify-between backdrop-blur">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-cyan-300 flex items-center gap-2">
+                <i data-lucide="wind" class="w-4 h-4"></i> 1. Plume Stagnation & Outward Wall Jet Dynamics
+              </h3>
+              <span class="text-xs font-mono text-gray-500">Gas Dynamics</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              As altitude $h$ decreases below the nozzle exit diameter ratio ($h/D_e < 8$), a normal shock forms above the lunar plane. Stagnation pressure $P_0(r)$ decays radially according to the Roberts-Adler self-similar formulation:
+            </p>
+
+            <div class="formula-box">
+              $$P(r, h) = P_{\text{stag}} \cdot \exp\left( -k \left( \frac{r}{h} \right)^2 \right), \quad P_{\text{stag}} \approx \frac{\gamma + 1}{2\gamma} \rho_{\text{jet}} v_{\text{exit}}^2 \left(\frac{D_e}{h}\right)^2$$
+            </div>
+
+            <p class="text-xs text-gray-300 leading-relaxed">
+              Outward radial gas velocity $v_r(r)$ reaches peak shear in the boundary wall jet layer at $r \approx 0.8 h \tan \theta_{\text{div}}$:
+            </p>
+
+            <div class="formula-box">
+              $$v_r(r) \approx v_{\text{exit}} \sqrt{1 - \left(\frac{P(r)}{P_{\text{stag}}}\right)^{\frac{\gamma-1}{\gamma}}}, \quad \tau_w = \frac{1}{2} C_f \rho_{\text{gas}}(r) v_r(r)^2$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-cyan-400/80 bg-cyan-950/30 p-2.5 rounded border border-cyan-900/40 mt-3">
+            Key Metric: Shear stress $\tau_w$ exceeds 140 Pa at touchdown altitudes, initiating catastrophic sheet scouring.
+          </div>
+        </div>
+
+        <!-- Card 2: Granular Soil Fluidization & Shield's Parameter -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 flex flex-col justify-between backdrop-blur">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-amber-300 flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4"></i> 2. Vacuum Fluidization & Regolith Scouring Inception
+              </h3>
+              <span class="text-xs font-mono text-gray-500">Soil Mechanics</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              Lunar regolith resists displacement via cohesive interparticle van der Waals forces and internal friction angle $\phi \approx 42^\circ$. Erosion initiates when modified vacuum Shields parameter $\theta^*$ surpasses the critical threshold $\theta_c$:
+            </p>
+
+            <div class="formula-box">
+              $$\theta^* = \frac{\tau_w}{(\rho_p - \rho_g) g_{\text{moon}} d_{50} + \frac{6 c}{\pi d_{50}}} \ge \theta_c \approx 0.045$$
+            </div>
+
+            <p class="text-xs text-gray-300 leading-relaxed">
+              Simultaneously, gas diffusing into the porous regolith creates upward vertical pressure gradients during plume transit, triggering deep explosive bulk fluidization when:
+            </p>
+
+            <div class="formula-box">
+              $$-\frac{\partial P}{\partial z} \ge (1 - \phi_p)(\rho_p - \rho_g) g_{\text{moon}}$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-amber-400/80 bg-amber-950/30 p-2.5 rounded border border-amber-900/40 mt-3">
+            Vacuum Effect: Zero ambient atmospheric backpressure amplifies upward gas escape gradients by $10^5 \times$.
+          </div>
+        </div>
+
+        <!-- Card 3: Real-Time Dynamic Cratering & Inversion Auditor -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 flex flex-col justify-between backdrop-blur">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-violet-300 flex items-center gap-2">
+                <i data-lucide="binary" class="w-4 h-4"></i> 3. Dynamic Cratering Rate & State Observer Inversion
+              </h3>
+              <span class="text-xs font-mono text-gray-500">Autonomous Filter</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              The crater excavation depth $h_c(t)$ is integrated along the engine centerline by balancing soil mass flux $\dot{m}_{\text{scour}}$ with inward gravitational slump:
+            </p>
+
+            <div class="formula-box">
+              $$\frac{d h_c}{dt} = \frac{\dot{E}_{\text{plume}}}{\rho_{\text{bulk}} \left( L_{\text{cohesion}} + \frac{1}{2} v_{\text{ej}}^2 \right)} - K_{\text{slump}} \sin(\alpha_{\text{slope}} - \phi)$$
+            </div>
+
+            <p class="text-xs text-gray-300 leading-relaxed">
+              Radar altimetry and baseplate pressure transducers form a recursive Kalman filter estimating soil density $\hat{\rho}_{\text{bulk}}$ and crater growth rate:
+            </p>
+
+            <div class="formula-box">
+              $$\hat{\mathbf{x}}_{k|k} = \hat{\mathbf{x}}_{k|k-1} + \mathbf{K}_k \left( \mathbf{z}_{\text{radar}} - \mathbf{H} \hat{\mathbf{x}}_{k|k-1} \right)$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-violet-400/80 bg-violet-950/30 p-2.5 rounded border border-violet-900/40 mt-3">
+            Real-time Inversion: 40 Hz audit loop computes crater depth within $\pm 1.4\text{ cm}$ precision before leg contact.
+          </div>
+        </div>
+
+        <!-- Card 4: High-Velocity Ejecta Sandblasting & Leg Failure -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 flex flex-col justify-between backdrop-blur">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-rose-300 flex items-center gap-2">
+                <i data-lucide="shield-x" class="w-4 h-4"></i> 4. Ejecta Ballistics & Baseplate Kinetic Sandblasting
+              </h3>
+              <span class="text-xs font-mono text-gray-500">Damage Physics</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              Ejected particles are accelerated by the expanding radial wall jet to velocities exceeding $v_p \approx 800 - 2,200\text{ m/s}$. The kinetic energy flux attacking the lander underbelly is:
+            </p>
+
+            <div class="formula-box">
+              $$\dot{\Phi}_{\text{kinetic}} = \frac{1}{2} \int_{0}^{R_{\text{lander}}} \dot{m}_{\text{ejecta}}(r) v_p(r)^2 \cos^3(\psi_{\text{angle}}) \, 2\pi r \, dr$$
+            </div>
+
+            <p class="text-xs text-gray-300 leading-relaxed">
+              Structural failure criterion occurs when cumulative kinetic blast damage $D_{\text{struct}}$ breaches MLI insulation or weakens landing strut buckling limits:
+            </p>
+
+            <div class="formula-box">
+              $$D_{\text{struct}} = \int_0^{t_{\text{touch}}} \left( \frac{\sigma_{\text{blast}}(t)}{\sigma_{\text{yield}}} \right)^m dt \ge 1.0 \implies \text{ABORT / SHUTDOWN}$$
+            </div>
+          </div>
+          <div class="text-[11px] font-mono text-rose-400/80 bg-rose-950/30 p-2.5 rounded border border-rose-900/40 mt-3">
+            Autonomous Cutoff Logic: Initiates terminal thruster cutoff at $h = 1.2\text{ m}$ if kinetic flux exceeds $45\text{ kW/m}^2$.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: NASA SBIR/STTR PROPOSAL & HARDWARE TRANSITION                    -->
+    <!-- ========================================================================= -->
+    <div id="viewProposal" class="hidden space-y-6">
+
+      <!-- Executive Header -->
+      <div class="bg-gray-900/70 border border-cyan-800/40 rounded-xl p-6 backdrop-blur">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono text-xs mb-2">
+              <span>NASA SBIR Topic Z10.02</span> • <span>Lunar Surface Operations & PSI Mitigation</span>
+            </div>
+            <h2 class="text-xl font-bold text-white">PlumeErosion: Real-Time Closed-Loop PSI Cratering & Sandblasting Auditor</h2>
+            <p class="text-xs text-gray-300 mt-1">Autonomous Flight Software Package for Human Landing System (HLS) & CLPS Touchdown Safety</p>
+          </div>
+          <div class="text-right font-mono">
+            <div class="text-2xl font-bold text-cyan-400">$225,000</div>
+            <div class="text-xs text-gray-400">Phase I Award • 6 Months Duration</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Partner & Subcontract Details -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+          <div class="flex items-center gap-2 text-cyan-400 text-sm font-semibold mb-2">
+            <i data-lucide="building-2" class="w-4 h-4"></i> University Partner (STTR 30%)
+          </div>
+          <h4 class="text-base font-bold text-white">University of Central Florida (UCF)</h4>
+          <p class="text-xs text-gray-400 mt-1">Center for Microgravity Research & Exolith Lab. Principal Investigator: Dr. Phil Metzger (World Expert in Lunar PSI Mechanics).</p>
+          <div class="mt-4 pt-3 border-t border-gray-800 flex justify-between font-mono text-xs">
+            <span class="text-gray-400">Subcontract Value:</span>
+            <span class="text-cyan-300 font-bold">$67,500 (30.0%)</span>
+          </div>
+        </div>
+
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+          <div class="flex items-center gap-2 text-amber-400 text-sm font-semibold mb-2">
+            <i data-lucide="flask-conical" class="w-4 h-4"></i> Vacuum Testing Facilities
+          </div>
+          <h4 class="text-base font-bold text-white">CATER High-Vacuum Chamber</h4>
+          <p class="text-xs text-gray-400 mt-1">Cryogenic vacuum chamber with LMS-1 high-fidelity lunar regolith simulant beds and high-speed shadowgraphy laser diagnostics.</p>
+          <div class="mt-4 pt-3 border-t border-gray-800 flex justify-between font-mono text-xs">
+            <span class="text-gray-400">Test Regime:</span>
+            <span class="text-amber-300 font-bold">$10^{-5}\text{ Torr}$ Vacuum PSI</span>
+          </div>
+        </div>
+
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+          <div class="flex items-center gap-2 text-emerald-400 text-sm font-semibold mb-2">
+            <i data-lucide="cpu" class="w-4 h-4"></i> Flight Computer Target
+          </div>
+          <h4 class="text-base font-bold text-white">SpaceVPX / Rad-Hard ARM</h4>
+          <p class="text-xs text-gray-400 mt-1">Deployable as a bare-metal C++ / Rust real-time safety monitor on BAE RAD5545 or Vorago VA41630 flight avionics with sub-10ms latency.</p>
+          <div class="mt-4 pt-3 border-t border-gray-800 flex justify-between font-mono text-xs">
+            <span class="text-gray-400">Flight Ready TRL:</span>
+            <span class="text-emerald-300 font-bold">TRL 3 $\to$ TRL 5</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6-Month Work Breakdown Milestones -->
+      <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+          <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i> Phase I 6-Month Technical Work Breakdown
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <!-- Month 1-2 -->
+          <div class="p-4 rounded-lg bg-gray-950/60 border border-gray-800">
+            <div class="text-xs font-mono text-cyan-400 mb-1">MILESTONE 1 (M1–M2)</div>
+            <h4 class="text-xs font-bold text-white">Vacuum Rarefied Gas-Solid DSMC Benchmark</h4>
+            <p class="text-[11px] text-gray-400 mt-2">
+              Couple Direct Simulation Monte Carlo (DSMC) gas solver with Discrete Element Method (DEM) for LHS-1/LMS-1 soil bed impingement. Validate threshold $(P, v)$ limits.
+            </p>
+            <div class="mt-3 text-[10px] font-mono text-cyan-300">Deliverable: Validated Scour Map</div>
+          </div>
+
+          <!-- Month 3 -->
+          <div class="p-4 rounded-lg bg-gray-950/60 border border-gray-800">
+            <div class="text-xs font-mono text-cyan-400 mb-1">MILESTONE 2 (M3)</div>
+            <h4 class="text-xs font-bold text-white">State Observer Inversion Algorithm</h4>
+            <p class="text-[11px] text-gray-400 mt-2">
+              Formulate 40 Hz recursive Extended Kalman Filter (EKF) using downward landing radar and differential pressure sensor array to reconstruct crater topography in real time.
+            </p>
+            <div class="mt-3 text-[10px] font-mono text-cyan-300">Deliverable: Math Kernel & C-Code</div>
+          </div>
+
+          <!-- Month 4-5 -->
+          <div class="p-4 rounded-lg bg-gray-950/60 border border-gray-800">
+            <div class="text-xs font-mono text-cyan-400 mb-1">MILESTONE 3 (M4–M5)</div>
+            <h4 class="text-xs font-bold text-white">Closed-Loop Abort & Engine Throttle Logic</h4>
+            <p class="text-[11px] text-gray-400 mt-2">
+              Integrate autonomous safety governor. Detects when sandblast kinetic energy exceeds allowable landing leg buckling limits and issues preemptive cutoff commands.
+            </p>
+            <div class="mt-3 text-[10px] font-mono text-cyan-300">Deliverable: Real-Time HIL Simulator</div>
+          </div>
+
+          <!-- Month 6 -->
+          <div class="p-4 rounded-lg bg-gray-950/60 border border-gray-800">
+            <div class="text-xs font-mono text-cyan-400 mb-1">MILESTONE 4 (M6)</div>
+            <h4 class="text-xs font-bold text-white">UCF Vacuum Test & Phase II Flight Spec</h4>
+            <p class="text-[11px] text-gray-400 mt-2">
+              Validate real-time auditor during scaled supersonic cold-gas thruster firings into regolith bed at UCF. Package commercial Phase II flight hardware roadmap.
+            </p>
+            <div class="mt-3 text-[10px] font-mono text-cyan-300">Deliverable: Final Report & Test Data</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase II Transition Plan -->
+      <div class="bg-gradient-to-r from-gray-900/90 to-gray-950 border border-gray-800 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-5">
+        <div>
+          <div class="flex items-center gap-2 text-violet-400 font-mono text-xs uppercase font-semibold">
+            <i data-lucide="rocket" class="w-4 h-4"></i> Phase II Transition Pathway ($850k–$1.25M)
+          </div>
+          <h4 class="text-base font-bold text-white mt-1">Direct Flight Integration on Commercial Lunar Payload Services (CLPS)</h4>
+          <p class="text-xs text-gray-300 mt-1 max-w-3xl">
+            Targeting commercial landers (Intuitive Machines Nova-C, Astrobotic Griffin, Blue Origin Blue Moon, SpaceX Starship HLS). Phase II will package an integrated optoelectronic-acoustic sensor suite and flight software library certified for Artemis missions.
+          </p>
+        </div>
+        <div class="flex-shrink-0">
+          <a href="mailto:support@rfwavecode.com" class="px-5 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-semibold flex items-center gap-2 shadow-lg shadow-cyan-950 transition">
+            <i data-lucide="mail" class="w-4 h-4"></i> Inquire Proposal Partnership
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: COMMERCIAL & NATIONWIDE ARR BREAKDOWN                             -->
+    <!-- ========================================================================= -->
+    <div id="viewARR" class="hidden space-y-6">
+
+      <!-- Executive Commercial Summary -->
+      <div class="bg-gray-900/70 border border-emerald-800/40 rounded-xl p-6 backdrop-blur">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs mb-2">
+              <span>DUAL-USE CIVIL COMMERCIALIZATION</span> • <span>5-YEAR ROADMAP</span>
+            </div>
+            <h2 class="text-xl font-bold text-white">Commercial Autonomous Fluidization & Impingement Auditor Suite</h2>
+            <p class="text-xs text-gray-300 mt-1 max-w-3xl">
+              PlumeErosion's core patent-pending boundary-layer gas dynamics and granular scouring inversion engine solves multi-billion dollar surface scour, dust entrainment, and fluidization failure across 6 major civil markets.
+            </p>
+          </div>
+          <div class="text-right font-mono">
+            <div class="text-3xl font-extrabold text-emerald-400">$218.4M</div>
+            <div class="text-xs text-gray-400">Target Civil Annual Recurring Revenue (ARR)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Financial ARR Distribution Table -->
+      <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 overflow-x-auto">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+          <i data-lucide="table" class="w-4 h-4 text-emerald-400"></i> Civil Market Verticals & SaaS Runtime Projections
+        </h3>
+        <table class="w-full text-left font-mono text-xs">
+          <thead>
+            <tr class="border-b border-gray-800 text-gray-400 bg-gray-950/40">
+              <th class="py-3 px-4">Market Vertical</th>
+              <th class="py-3 px-4">Target Application</th>
+              <th class="py-3 px-4">Software Runtime / Pricing Model</th>
+              <th class="py-3 px-4">Asset Base (US/Global)</th>
+              <th class="py-3 px-4 text-right">Mature 5-Yr ARR</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-800/60 text-gray-300">
+            <tr class="hover:bg-gray-800/30">
+              <td class="py-3 px-4 font-semibold text-white">1. Commercial Lunar & Mars (CLPS/Artemis)</td>
+              <td class="py-3 px-4">Lander Touchdown Cratering & Pad Integrity</td>
+              <td class="py-3 px-4">$1.25M / mission license + $180k audit</td>
+              <td class="py-3 px-4">24 landers/yr by 2030</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-400">$34.3M</td>
+            </tr>
+            <tr class="hover:bg-gray-800/30">
+              <td class="py-3 px-4 font-semibold text-white">2. Heavy Civil VTOL & Heliport Operations</td>
+              <td class="py-3 px-4">Rotorwash Brownout & Unpaved Pad Erosion</td>
+              <td class="py-3 px-4">$12,000 / aircraft/yr onboard avionics SaaS</td>
+              <td class="py-3 px-4">3,800 civil transport helicopters</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-400">$45.6M</td>
+            </tr>
+            <tr class="hover:bg-gray-800/30">
+              <td class="py-3 px-4 font-semibold text-white">3. Autonomous Open-Pit Surface Mining</td>
+              <td class="py-3 px-4">Blast Hole Gas Venting & Haul Road Dust Scour</td>
+              <td class="py-3 px-4">$45,000 / autonomous haul truck fleet/yr</td>
+              <td class="py-3 px-4">1,150 mine sites worldwide</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-400">$51.7M</td>
+            </tr>
+            <tr class="hover:bg-gray-800/30">
+              <td class="py-3 px-4 font-semibold text-white">4. Spaceport Infrastructure & Launch Mounts</td>
+              <td class="py-3 px-4">Acoustic Deluge & Flame Trench Concrete Spalling</td>
+              <td class="py-3 px-4">$650,000 / spaceport launch mount/yr</td>
+              <td class="py-3 px-4">42 active commercial launch pads</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-400">$27.3M</td>
+            </tr>
+            <tr class="hover:bg-gray-800/30">
+              <td class="py-3 px-4 font-semibold text-white">5. High-Pressure Industrial Gas Jet Milling</td>
+              <td class="py-3 px-4">Pneumatic Powder Conveying & Fluidized Bed Scour</td>
+              <td class="py-3 px-4">$8,500 / chemical milling chamber/yr</td>
+              <td class="py-3 px-4">4,200 pharmaceutical & alloy plants</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-400">$35.7M</td>
+            </tr>
+            <tr class="hover:bg-gray-800/30">
+              <td class="py-3 px-4 font-semibold text-white">6. Utility Desert Solar PV Farms</td>
+              <td class="py-3 px-4">Wind Scour & Sand Inundation Boundary Auditing</td>
+              <td class="py-3 px-4">$450 / MW / year aerodynamic audit layer</td>
+              <td class="py-3 px-4">53,000 MW desert utility solar</td>
+              <td class="py-3 px-4 text-right font-bold text-emerald-400">$23.8M</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="border-t-2 border-gray-700 bg-gray-950/80 font-bold text-white">
+              <td colspan="4" class="py-3 px-4 text-right uppercase tracking-wider text-xs">Total Addressable Civil ARR Target:</td>
+              <td class="py-3 px-4 text-right text-emerald-400 text-sm">$218.4M</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- 6 Industry Deep-Dive Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+        <!-- Card 1 -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+              <span>COMMERCIAL SPACE</span> <i data-lucide="rocket" class="w-4 h-4"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-2">Commercial Lunar Payload Services (CLPS)</h4>
+            <p class="text-xs text-gray-300">
+              <strong>Physics in 1 Sentence:</strong> Compressible rocket plume wall jet shears abrasive unweathered jagged dust particles into an expanding conical sheet travelling at hypersonic speeds into lander subsystems.
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+              <strong>Why Others Missed This:</strong> Legacy programs assumed simple static bearing strength and flat terrain; they failed to anticipate dynamic fluidization deep-pitting that can tilt landers on touchdown.
+            </p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-gray-800/80 text-[11px] font-mono text-emerald-400">ARR: $34.3M • 24 Landers/yr</div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+              <span>AEROSPACE CIVIL VTOL</span> <i data-lucide="plane-takeoff" class="w-4 h-4"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-2">Civil Heliport & eVTOL Urban Brownout</h4>
+            <p class="text-xs text-gray-300">
+              <strong>Physics in 1 Sentence:</strong> Rotor downwash produces high ground stagnation overpressure that entrains loose aggregate into blinding dust vortices, depriving pilots of visual reference.
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+              <strong>Why Others Missed This:</strong> Competitors rely solely on passive cockpit synthetic vision; our software models dynamic surface gravel shear to proactively limit downwash authority near ground.
+            </p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-gray-800/80 text-[11px] font-mono text-emerald-400">ARR: $45.6M • 3,800 Aircraft</div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+              <span>AUTONOMOUS MINING</span> <i data-lucide="hard-hat" class="w-4 h-4"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-2">Open-Pit Haul Road & Explosive Venting</h4>
+            <p class="text-xs text-gray-300">
+              <strong>Physics in 1 Sentence:</strong> Sudden gas release from blasting causes localized shear wall failure, while heavy autonomous haulers induce dynamic fluidization in unpaved road substrate.
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+              <strong>Why Others Missed This:</strong> Mining operators spray millions of gallons of water manually rather than running continuous real-time $(P, v)$ granular shear monitoring on haul routes.
+            </p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-gray-800/80 text-[11px] font-mono text-emerald-400">ARR: $51.7M • 1,150 Mines</div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+              <span>LAUNCH INFRASTRUCTURE</span> <i data-lucide="flame" class="w-4 h-4"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-2">Spaceport Flame Trench & Concrete Spalling</h4>
+            <p class="text-xs text-gray-300">
+              <strong>Physics in 1 Sentence:</strong> Rocket exhaust pressures exceeding 4 MPa shatter refractory concrete via moisture thermal expansion and high supersonic wall jet shear scouring.
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+              <strong>Why Others Missed This:</strong> Pad engineers perform slow post-flight visual inspections; our real-time auditor calculates concrete spalling depth mid-burn to trigger emergency water deluge boosts.
+            </p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-gray-800/80 text-[11px] font-mono text-emerald-400">ARR: $27.3M • 42 Spaceports</div>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+              <span>INDUSTRIAL MANUFACTURING</span> <i data-lucide="cpu" class="w-4 h-4"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-2">Pneumatic Powder & Jet Milling</h4>
+            <p class="text-xs text-gray-300">
+              <strong>Physics in 1 Sentence:</strong> High-velocity sonic gas nozzles in micronization chambers suffer erosive nozzle erosion and uneven fluidized bed scouring without boundary pressure optimization.
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+              <strong>Why Others Missed This:</strong> Industrial plants treat nozzles as consumable scrap; closed-loop $(P, v)$ tuning extends titanium carbide chamber liner lifespans by $340\%$.
+            </p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-gray-800/80 text-[11px] font-mono text-emerald-400">ARR: $35.7M • 4,200 Plants</div>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono text-cyan-400 mb-2">
+              <span>CLEAN ENERGY UTILITIES</span> <i data-lucide="sun" class="w-4 h-4"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-2">Desert Utility Solar PV Scour Protection</h4>
+            <p class="text-xs text-gray-300">
+              <strong>Physics in 1 Sentence:</strong> Micro-scale wind shear creates saltation curtains of high-speed silica that permanently micro-pit anti-reflective photovoltaic module glass coatings.
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+              <strong>Why Others Missed This:</strong> Solar operators schedule fixed mechanical wiper trucks that accelerate scratching; our dynamic fluidization auditor commands stow angles ahead of saltation fronts.
+            </p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-gray-800/80 text-[11px] font-mono text-emerald-400">ARR: $23.8M • 53k MW Solar</div>
+        </div>
+
+      </div>
+
+      <!-- Enterprise Valuation Callout & Contact Footer -->
+      <div class="bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 border border-gray-800 rounded-xl p-6 text-center space-y-3">
+        <div class="text-xs font-mono uppercase tracking-widest text-emerald-400 font-semibold">ENTERPRISE VALUATION MULTIPLE</div>
+        <h3 class="text-2xl font-extrabold text-white">
+          $1.74B – $2.62B Deep-Tech Software Valuation
+        </h3>
+        <p class="text-xs text-gray-400 max-w-2xl mx-auto">
+          Calculated at standard 8x–12x ARR deep-tech enterprise multiples for mission-critical aerospace and industrial autonomous safety kernels with verified NASA STTR heritage.
+        </p>
+        <div class="pt-2">
+          <a href="mailto:support@rfwavecode.com" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition shadow-lg shadow-emerald-950">
+            <i data-lucide="mail" class="w-4 h-4"></i> Direct Inquiries: support@rfwavecode.com
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-gray-800/80 bg-[#05070d] py-3 px-6 text-center text-xs text-gray-500 font-mono">
+    <span>NASA SBIR Topic Z10.02 • Plume Surface Interaction (PSI) Flight Auditor • Developed with UCF CATER Research Labs</span>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT LOGIC ENGINE: CANVAS DYNAMICS, CHARTS, & RECURSIVE OBSERVER   -->
+  <!-- ========================================================================= -->
+  <script>
+    // Tab Switching Architecture with DOM Integrity Mapping
+    const tabMapping = {
+      'sim': { viewId: 'viewSim', btnId: 'tabBtnSim' },
+      'physics': { viewId: 'viewPhysics', btnId: 'tabBtnPhysics' },
+      'proposal': { viewId: 'viewProposal', btnId: 'tabBtnProposal' },
+      'arr': { viewId: 'viewARR', btnId: 'tabBtnARR' }
+    };
+
+    function switchTab(targetKey) {
+      Object.keys(tabMapping).forEach(key => {
+        const item = tabMapping[key];
+        const viewEl = document.getElementById(item.viewId);
+        const btnEl = document.getElementById(item.btnId);
+
+        if (key === targetKey) {
+          viewEl.classList.remove('hidden');
+          btnEl.className = "px-4 py-1.5 rounded-md text-cyan-400 bg-cyan-950/40 border border-cyan-800/60 flex items-center gap-1.5 transition";
+        } else {
+          viewEl.classList.add('hidden');
+          btnEl.className = "px-4 py-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-800/40 flex items-center gap-1.5 transition";
+        }
+      });
+
+      // Typeset MathJax equations cleanly upon tab entry
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise();
+      }
+
+      // Re-trigger Canvas sizing if returning to simulation
+      if (targetKey === 'sim') {
+        setTimeout(resizeCanvas, 50);
+      }
+    }
+
+    // =========================================================================
+    // SIMULATION STATE VARIABLES
+    // =========================================================================
+    let landerState = {
+      altitude: 14.0,       // meters above surface
+      vz: -1.1,             // m/s descent velocity
+      throttle: 0.75,       // fraction 0.2 - 1.0
+      thrust: 22.4,         // kN
+      cohesion: 0.8,        // kPa
+      d50: 72,              // micrometers
+      craterDepth: 0.18,    // meters
+      craterRadius: 1.4,    // meters
+      stagnationP: 14.2,    // kPa
+      radialVel: 1840,      // m/s
+      ejectaFlux: 4.2,      // kg/m^2-s
+      sandblastEnergy: 18.5,// kW/m^2
+      blastRiskPct: 12,     // percent
+      autoDescentActive: false,
+      autoCutoffTriggered: false,
+      legsDeployed: true,
+      timeStep: 0
+    };
+
+    // Telemetry History for Charts (Circular buffers)
+    const MAX_HIST = 30;
+    const historyData = {
+      labels: Array.from({length: MAX_HIST}, (_, i) => `-${MAX_HIST - i}s`),
+      craterDepth: Array(MAX_HIST).fill(0.18),
+      ejectaRate: Array(MAX_HIST).fill(4.2),
+      sandblastEnergy: Array(MAX_HIST).fill(18.5),
+      legStress: Array(MAX_HIST).fill(22)
+    };
+
+    // Particles array for dynamic Canvas visualizer
+    let particles = [];
+    const MAX_PARTICLES = 160;
+
+    // =========================================================================
+    // CANVAS DYNAMICS (HIGH-DPI & FLUID PARTICLES)
+    // =========================================================================
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 600;
+      const h = rect.height || 360;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // Initialize Dust & Gas Particles
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        resetParticle(i, true);
+      }
+    }
+
+    function resetParticle(i, randomize = false) {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 600;
+      const h = rect.height || 360;
+      const groundY = h - 60;
+
+      // Lander visual center
+      const landerY = Math.max(40, groundY - (landerState.altitude * 8.5));
+      const landerX = w / 2;
+
+      particles[i] = {
+        x: landerX + (Math.random() - 0.5) * 16,
+        y: landerY + 28 + Math.random() * 5,
+        vx: (Math.random() - 0.5) * 4,
+        vy: 4 + Math.random() * 6 * (landerState.throttle),
+        size: Math.random() * 2 + 1,
+        life: randomize ? Math.random() * 60 : 60,
+        maxLife: 60,
+        type: Math.random() > 0.4 ? 'gas' : 'regolith',
+        color: ''
+      };
+    }
+
+    // Canvas Rendering Loop
+    function renderCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 600;
+      const h = rect.height || 360;
+      const groundY = h - 60;
+      
+      // Calculate lander display height
+      const landerY = Math.max(40, groundY - (landerState.altitude * 8.5));
+      const landerX = w / 2;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Deep space starry backdrop
+      ctx.fillStyle = "#020408";
+      ctx.fillRect(0, 0, w, h);
+
+      // Draw faint stars
+      ctx.fillStyle = "rgba(255,255,255,0.2)";
+      for (let s = 0; s < 25; s++) {
+        const sx = (s * 47) % w;
+        const sy = (s * 31) % (groundY - 80);
+        ctx.fillRect(sx, sy, 1.5, 1.5);
+      }
+
+      // Draw Lunar Regolith Ground with Dynamic Crater
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      
+      const craterPixelRadius = Math.min(180, landerState.craterRadius * 40);
+      const craterPixelDepth = Math.min(50, landerState.craterDepth * 90);
+
+      // Ground profile with crater excavation curve
+      ctx.lineTo(landerX - craterPixelRadius, groundY);
+      ctx.quadraticCurveTo(
+        landerX, groundY + craterPixelDepth, 
+        landerX + craterPixelRadius, groundY
+      );
+      ctx.lineTo(w, groundY);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+
+      // Regolith Layer Gradient
+      const regGrad = ctx.createLinearGradient(0, groundY - 10, 0, h);
+      regGrad.addColorStop(0, "#334155");
+      regGrad.addColorStop(0.3, "#1e293b");
+      regGrad.addColorStop(1, "#0f172a");
+      ctx.fillStyle = regGrad;
+      ctx.fill();
+
+      // Surface rim details
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw Crater Scour Shockwave Rings if Altitude is Low
+      if (landerState.altitude < 25 && !landerState.autoCutoffTriggered) {
+        ctx.save();
+        ctx.beginPath();
+        const shockAlpha = Math.max(0, 0.6 - (landerState.altitude / 35));
+        ctx.strokeStyle = `rgba(56, 189, 248, ${shockAlpha})`;
+        ctx.lineWidth = 2;
+        ctx.ellipse(landerX, groundY + 5, craterPixelRadius * 1.3, 10, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Boundary radial wall jet vectors (arrows)
+        ctx.strokeStyle = `rgba(168, 85, 247, ${shockAlpha * 0.8})`;
+        ctx.fillStyle = `rgba(168, 85, 247, ${shockAlpha * 0.8})`;
+        // Left vector
+        drawArrow(ctx, landerX - 25, groundY + 4, landerX - craterPixelRadius * 1.2, groundY - 6);
+        // Right vector
+        drawArrow(ctx, landerX + 25, groundY + 4, landerX + craterPixelRadius * 1.2, groundY - 6);
+        ctx.restore();
+      }
+
+      // Draw Supersonic Plume Exhaust Column
+      if (!landerState.autoCutoffTriggered) {
+        ctx.save();
+        const plumeHeight = Math.max(10, groundY - (landerY + 32));
+        const plumeGrad = ctx.createLinearGradient(landerX, landerY + 30, landerX, groundY);
+        plumeGrad.addColorStop(0, "rgba(56, 189, 248, 0.95)");
+        plumeGrad.addColorStop(0.3, "rgba(147, 51, 234, 0.8)");
+        plumeGrad.addColorStop(0.7, "rgba(239, 68, 68, 0.5)");
+        plumeGrad.addColorStop(1, "rgba(245, 158, 11, 0.15)");
+
+        ctx.beginPath();
+        ctx.moveTo(landerX - 12, landerY + 30);
+        // Mach diamond expansion angle increases as pressure falls
+        const plumeSpread = Math.min(110, 16 + (plumeHeight * 0.45));
+        ctx.lineTo(landerX - plumeSpread, groundY + 2);
+        ctx.lineTo(landerX + plumeSpread, groundY + 2);
+        ctx.lineTo(landerX + 12, landerY + 30);
+        ctx.closePath();
+        ctx.fillStyle = plumeGrad;
+        ctx.fill();
+
+        // Supersonic Mach Diamonds
+        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+        for (let m = 1; m <= 3; m++) {
+          const dy = landerY + 30 + (m * 20);
+          if (dy < groundY - 10) {
+            ctx.beginPath();
+            ctx.moveTo(landerX, dy - 5);
+            ctx.lineTo(landerX + 5, dy);
+            ctx.lineTo(landerX, dy + 5);
+            ctx.lineTo(landerX - 5, dy);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      // Update & Draw Particles (Gas & Sandblast Ejecta)
+      ctx.save();
+      for (let i = 0; i < particles.length; i++) {
+        let p = particles[i];
+        p.life--;
+
+        // Physical trajectory
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Wall jet bounce dynamics when hitting the ground
+        if (p.y >= groundY) {
+          p.y = groundY - 2;
+          const dir = p.x < landerX ? -1 : 1;
+          const wallJetSpeed = (landerState.radialVel / 350) * (landerState.throttle);
+          p.vx = dir * (wallJetSpeed + Math.random() * 4);
+          p.vy = -(1.5 + Math.random() * 3.5); // Upward spray angle
+          p.type = 'regolith'; // Entrained abrasive sand
+        }
+
+        // Draw particle
+        if (p.type === 'gas') {
+          ctx.fillStyle = `rgba(56, 189, 248, ${p.life / p.maxLife})`;
+        } else {
+          // Sandblasting rock fragment / regolith
+          ctx.fillStyle = `rgba(245, 158, 11, ${p.life / p.maxLife})`;
+        }
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+
+        // Reset dead particle
+        if (p.life <= 0 || p.x < 0 || p.x > w) {
+          resetParticle(i);
+        }
+      }
+      ctx.restore();
+
+      // Draw Lunar Lander Hardware (Engine Bell, Core, Landing Legs)
+      ctx.save();
+      // Descent Module Body
+      ctx.fillStyle = "#64748b";
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.5;
+      
+      // Central Avionics Deck
+      ctx.beginPath();
+      ctx.roundRect(landerX - 26, landerY - 22, 52, 28, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Gold Multi-Layer Insulation (MLI) Wrap Foil
+      ctx.fillStyle = "#d97706";
+      ctx.fillRect(landerX - 20, landerY - 18, 40, 16);
+
+      // Rocket Engine Bell Nozzle
+      ctx.beginPath();
+      ctx.moveTo(landerX - 8, landerY + 6);
+      ctx.lineTo(landerX - 16, landerY + 30);
+      ctx.lineTo(landerX + 16, landerY + 30);
+      ctx.lineTo(landerX + 8, landerY + 6);
+      ctx.closePath();
+      ctx.fillStyle = "#1e293b";
+      ctx.strokeStyle = "#06b6d4";
+      ctx.lineWidth = 1.5;
+      ctx.fill();
+      ctx.stroke();
+
+      // Landing Legs & Footpads
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 2.5;
+      
+      // Left Strut
+      ctx.beginPath();
+      ctx.moveTo(landerX - 24, landerY + 2);
+      ctx.lineTo(landerX - 52, landerY + 44);
+      // Footpad
+      ctx.lineTo(landerX - 60, landerY + 44);
+      ctx.stroke();
+
+      // Right Strut
+      ctx.beginPath();
+      ctx.moveTo(landerX + 24, landerY + 2);
+      ctx.lineTo(landerX + 52, landerY + 44);
+      // Footpad
+      ctx.lineTo(landerX + 60, landerY + 44);
+      ctx.stroke();
+
+      // Pressure Transducer Array Indicators (Green/Red LED)
+      ctx.fillStyle = landerState.sandblastEnergy > 35 ? "#ef4444" : "#10b981";
+      ctx.beginPath();
+      ctx.arc(landerX - 20, landerY + 12, 2.5, 0, Math.PI * 2);
+      ctx.arc(landerX + 20, landerY + 12, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Canvas arrow helper
+    function drawArrow(context, fromx, fromy, tox, toy) {
+      const headlen = 6;
+      const angle = Math.atan2(toy - fromy, tox - fromx);
+      context.beginPath();
+      context.moveTo(fromx, fromy);
+      context.lineTo(tox, toy);
+      context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+      context.moveTo(tox, toy);
+      context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+      context.stroke();
+    }
+
+    // =========================================================================
+    // CHART.JS INITIALIZATION (PHASE SPACE & TIME-SERIES)
+    // =========================================================================
+    let phaseChart, chartCraterTime, chartSandblastTime;
+
+    function initCharts() {
+      // 1. Primary Diagnostic: Phase-Space Velocity (v) vs Pressure (P)
+      const ctxPhase = document.getElementById('phaseChart').getContext('2d');
+      
+      // Theoretical nominal baseline corridor data
+      const nominalCurve = [
+        { x: 300, y: 1.2 },
+        { x: 600, y: 3.4 },
+        { x: 1000, y: 7.8 },
+        { x: 1400, y: 14.5 },
+        { x: 1750, y: 22.0 },
+        { x: 2100, y: 31.0 }
+      ];
+
+      // Critical Hazard Boundary (Blast-Back Zone)
+      const hazardBoundary = [
+        { x: 200, y: 38 },
+        { x: 800, y: 36 },
+        { x: 1300, y: 30 },
+        { x: 1700, y: 24 },
+        { x: 2200, y: 18 },
+        { x: 2600, y: 14 }
+      ];
+
+      phaseChart = new Chart(ctxPhase, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'Live Operating Vector (v, P)',
+              data: [{ x: landerState.radialVel, y: landerState.stagnationP }],
+              backgroundColor: '#38bdf8',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              pointRadius: 9,
+              pointHoverRadius: 11,
+              showLine: false,
+              order: 1
+            },
+            {
+              label: 'Nominal Descent Corridor',
+              data: nominalCurve,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.08)',
+              borderWidth: 2,
+              showLine: true,
+              pointRadius: 0,
+              tension: 0.35,
+              order: 3
+            },
+            {
+              label: 'Crater Blast-Back Hazard Boundary',
+              data: hazardBoundary,
+              borderColor: '#ef4444',
+              borderDash: [6, 4],
+              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+              borderWidth: 2,
+              showLine: true,
+              fill: true,
+              pointRadius: 0,
+              tension: 0.3,
+              order: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Outward Wall Jet Gas Velocity: v (m/s)',
+                color: '#94a3b8',
+                font: { family: 'JetBrains Mono', size: 11 }
+              },
+              grid: { color: 'rgba(31, 41, 55, 0.6)' },
+              ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } },
+              min: 0,
+              max: 2600
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Plume Stagnation Pressure: P (kPa)',
+                color: '#94a3b8',
+                font: { family: 'JetBrains Mono', size: 11 }
+              },
+              grid: { color: 'rgba(31, 41, 55, 0.6)' },
+              ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } },
+              min: 0,
+              max: 50
+            }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                color: '#cbd5e1',
+                boxWidth: 12,
+                font: { family: 'Inter', size: 11 }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `Velocity: ${context.parsed.x} m/s, Pressure: ${context.parsed.y} kPa`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 2. Telemetry 1: Cratering Depth & Soil Mass Ejection Flux
+      const ctxCrater = document.getElementById('chartCraterTime').getContext('2d');
+      chartCraterTime = new Chart(ctxCrater, {
+        type: 'line',
+        data: {
+          labels: historyData.labels,
+          datasets: [
+            {
+              label: 'Crater Depth hc (m)',
+              data: historyData.craterDepth,
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              yAxisID: 'y',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.25
+            },
+            {
+              label: 'Ejecta Flux (kg/m²s)',
+              data: historyData.ejectaRate,
+              borderColor: '#38bdf8',
+              borderDash: [4, 3],
+              yAxisID: 'y1',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.25
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#475569', font: { family: 'JetBrains Mono', size: 9 }, maxTicksLimit: 6 }
+            },
+            y: {
+              position: 'left',
+              title: { display: true, text: 'Depth (m)', color: '#f59e0b', font: { size: 10 } },
+              grid: { color: 'rgba(31, 41, 55, 0.4)' },
+              ticks: { color: '#f59e0b', font: { size: 9 } },
+              min: 0,
+              max: 1.5
+            },
+            y1: {
+              position: 'right',
+              title: { display: true, text: 'Flux (kg/m²s)', color: '#38bdf8', font: { size: 10 } },
+              grid: { display: false },
+              ticks: { color: '#38bdf8', font: { size: 9 } },
+              min: 0,
+              max: 20
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 10 } }
+          }
+        }
+      });
+
+      // 3. Telemetry 2: Sandblast Energy & Strut Stress
+      const ctxSand = document.getElementById('chartSandblastTime').getContext('2d');
+      chartSandblastTime = new Chart(ctxSand, {
+        type: 'line',
+        data: {
+          labels: historyData.labels,
+          datasets: [
+            {
+              label: 'Sandblast Flux (kW/m²)',
+              data: historyData.sandblastEnergy,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              pointRadius: 0,
+              tension: 0.25
+            },
+            {
+              label: 'Strut Blast Stress (%)',
+              data: historyData.legStress,
+              borderColor: '#a855f7',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.25
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#475569', font: { family: 'JetBrains Mono', size: 9 }, maxTicksLimit: 6 }
+            },
+            y: {
+              title: { display: true, text: 'Intensity / Stress', color: '#94a3b8', font: { size: 10 } },
+              grid: { color: 'rgba(31, 41, 55, 0.4)' },
+              ticks: { color: '#94a3b8', font: { size: 9 } },
+              min: 0,
+              max: 100
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 10 } }
+          }
+        }
+      });
+    }
+
+    // =========================================================================
+    // PHYSICAL PHYSICS STEP & DYNAMIC AUDITOR ENGINE
+    // =========================================================================
+    function stepPhysics() {
+      landerState.timeStep++;
+
+      // Automated descent rate integration
+      if (landerState.autoDescentActive && !landerState.autoCutoffTriggered) {
+        landerState.altitude += landerState.vz * 0.05;
+        if (landerState.altitude <= 1.2) {
+          // Preemptive engine shutdown at threshold proximity
+          triggerAutoCutoff();
+        }
+      }
+
+      const h = Math.max(0.6, landerState.altitude);
+      const throttle = landerState.throttle;
+
+      // Calculate Physical Plume Interaction
+      // 1. Stagnation Pressure P_0: Scales with throttle and inverse square of altitude
+      const pMaxThrust = 28.0; // kN
+      landerState.thrust = pMaxThrust * throttle;
+      
+      const effectiveH = Math.max(1.1, h);
+      landerState.stagnationP = (24.0 * throttle * Math.pow(3.0 / effectiveH, 1.85));
+      
+      // Outward boundary gas velocity peaks when altitude is low
+      const baseExitV = 2350; // m/s gas exit velocity
+      const pressureRatio = Math.min(0.92, landerState.stagnationP / 55.0);
+      landerState.radialVel = Math.round(baseExitV * Math.sqrt(1 - Math.pow(pressureRatio, 0.28)));
+
+      // Critical shear threshold based on regolith cohesion and grain size
+      const tauCrit = (landerState.cohesion * 180) + (landerState.d50 * 0.35); // Pa
+      const actualShear = 0.5 * 0.008 * (landerState.stagnationP * 10) * Math.pow(landerState.radialVel / 1000, 2);
+
+      // Cratering Rate & Sandblast Ejection
+      if (actualShear > tauCrit) {
+        const excessShear = (actualShear - tauCrit) / 100;
+        landerState.ejectaFlux = Math.min(18.5, excessShear * 1.8 * (throttle));
+        
+        // Deep excavation rate
+        const excavationFactor = 0.0006 * (excessShear / (landerState.cohesion + 0.2));
+        landerState.craterDepth = Math.min(1.4, landerState.craterDepth + excavationFactor);
+        landerState.craterRadius = Math.min(3.2, 1.1 + (landerState.craterDepth * 1.4));
+      } else {
+        landerState.ejectaFlux = Math.max(0.1, landerState.ejectaFlux * 0.95);
+      }
+
+      // Sandblast Kinetic Energy: 1/2 * m_dot * v^2
+      landerState.sandblastEnergy = Math.min(95, (0.5 * landerState.ejectaFlux * Math.pow(landerState.radialVel / 1000, 2) * 8.2));
+      const strutStress = Math.min(100, (landerState.sandblastEnergy * 1.05) + (landerState.stagnationP * 0.65));
+
+      // Calculate Blast Hazard Risk
+      let hazardRisk = 0;
+      if (landerState.stagnationP > 25 || landerState.sandblastEnergy > 38) {
+        hazardRisk = Math.min(100, Math.round(((landerState.sandblastEnergy - 25) / 50) * 100) + 20);
+      } else {
+        hazardRisk = Math.max(5, Math.round((landerState.stagnationP / 35) * 30));
+      }
+      landerState.blastRiskPct = hazardRisk;
+
+      // AUTONOMOUS SAFETY INTERVENTION GOVERNOR
+      // If sandblast energy breaches structural damage threshold during low approach, force shutdown
+      if (hazardRisk >= 75 && h < 6.0 && !landerState.autoCutoffTriggered) {
+        triggerAutoCutoff();
+      }
+
+      // Sync DOM Badges & Text Outputs
+      updateDOMTelemetry(actualShear, tauCrit, strutStress);
+
+      // Throttled Chart Updates (Every 4 ticks)
+      if (landerState.timeStep % 4 === 0) {
+        updateChartTelemetry(strutStress);
+      }
+    }
+
+    function updateDOMTelemetry(actualShear, tauCrit, strutStress) {
+      document.getElementById('badgeAlt').innerText = `${landerState.altitude.toFixed(1)} m`;
+      document.getElementById('badgeCrater').innerText = `${landerState.craterDepth.toFixed(2)} m`;
+      
+      const badgeRegime = document.getElementById('badgeRegime');
+      if (landerState.autoCutoffTriggered) {
+        badgeRegime.innerText = "ENGINE CUTOFF (TOUCHDOWN)";
+        badgeRegime.className = "text-cyan-400 font-bold ml-1";
+      } else if (actualShear > tauCrit * 2.5) {
+        badgeRegime.innerText = "EXPLOSIVE FLUIDIZATION";
+        badgeRegime.className = "text-rose-400 font-bold ml-1 animate-pulse";
+      } else if (actualShear > tauCrit) {
+        badgeRegime.innerText = "SHEAR SCOURING";
+        badgeRegime.className = "text-amber-400 font-bold ml-1";
+      } else {
+        badgeRegime.innerText = "DIFFUSE WALL JET";
+        badgeRegime.className = "text-emerald-400 font-bold ml-1";
+      }
+
+      const badgeRisk = document.getElementById('badgeRisk');
+      badgeRisk.innerText = `${landerState.blastRiskPct}%`;
+      if (landerState.blastRiskPct > 60) {
+        badgeRisk.className = "text-rose-400 font-bold ml-1 animate-pulse";
+      } else if (landerState.blastRiskPct > 30) {
+        badgeRisk.className = "text-amber-400 font-bold ml-1";
+      } else {
+        badgeRisk.className = "text-emerald-400 font-bold ml-1";
+      }
+
+      // HUD overlay elements
+      document.getElementById('txtVz').innerText = `${landerState.vz.toFixed(2)} m/s`;
+      document.getElementById('txtThrust').innerText = `${landerState.thrust.toFixed(1)} kN`;
+      document.getElementById('hudP0').innerText = `${landerState.stagnationP.toFixed(1)} kPa`;
+      document.getElementById('hudVr').innerText = `${landerState.radialVel.toLocaleString()} m/s`;
+      document.getElementById('hudFlux').innerText = `${landerState.ejectaFlux.toFixed(1)} kg/m²s`;
+
+      // Sliders labels
+      document.getElementById('valAlt').innerText = `${landerState.altitude.toFixed(1)}m`;
+      document.getElementById('valThrottle').innerText = `${Math.round(landerState.throttle * 100)}%`;
+      document.getElementById('valCohesion').innerText = `${landerState.cohesion.toFixed(1)} kPa`;
+      document.getElementById('valGrain').innerText = `${landerState.d50} µm`;
+      document.getElementById('sliderAlt').value = landerState.altitude;
+    }
+
+    function updateChartTelemetry(strutStress) {
+      // 1. Update Phase Diagram Point
+      if (phaseChart) {
+        phaseChart.data.datasets[0].data = [{
+          x: landerState.radialVel,
+          y: parseFloat(landerState.stagnationP.toFixed(1))
+        }];
+        
+        // Highlight active point color based on risk
+        phaseChart.data.datasets[0].backgroundColor = landerState.blastRiskPct > 60 ? '#ef4444' : '#38bdf8';
+        phaseChart.update();
+      }
+
+      // 2. Shift and Push Time Series History
+      historyData.craterDepth.shift();
+      historyData.craterDepth.push(landerState.craterDepth);
+
+      historyData.ejectaRate.shift();
+      historyData.ejectaRate.push(landerState.ejectaFlux);
+
+      historyData.sandblastEnergy.shift();
+      historyData.sandblastEnergy.push(landerState.sandblastEnergy);
+
+      historyData.legStress.shift();
+      historyData.legStress.push(strutStress);
+
+      if (chartCraterTime && chartSandblastTime) {
+        chartCraterTime.update();
+        chartSandblastTime.update();
+      }
+    }
+
+    // =========================================================================
+    // INTERACTIVE CONTROLS & FAULT INJECTION
+    // =========================================================================
+    document.getElementById('sliderAlt').addEventListener('input', function(e) {
+      landerState.altitude = parseFloat(e.target.value);
+    });
+
+    document.getElementById('sliderThrottle').addEventListener('input', function(e) {
+      landerState.throttle = parseInt(e.target.value) / 100;
+    });
+
+    document.getElementById('sliderCohesion').addEventListener('input', function(e) {
+      landerState.cohesion = parseFloat(e.target.value);
+    });
+
+    document.getElementById('sliderGrain').addEventListener('input', function(e) {
+      landerState.d50 = parseInt(e.target.value);
+    });
+
+    function toggleAutoDescent() {
+      landerState.autoDescentActive = !landerState.autoDescentActive;
+      const btnTxt = document.getElementById('txtAutoDescent');
+      if (landerState.autoDescentActive) {
+        btnTxt.innerText = "Pause Automated Descent";
+        landerState.autoCutoffTriggered = false;
+        document.getElementById('recoveryBanner').classList.add('hidden');
+      } else {
+        btnTxt.innerText = "Run Automated Descent";
+      }
+    }
+
+    function injectCrateringFault() {
+      // Injects highly uncompacted loose dust & spikes throttle near surface
+      landerState.altitude = 4.2;
+      landerState.throttle = 0.98;
+      landerState.cohesion = 0.15;
+      landerState.d50 = 35;
+      landerState.autoCutoffTriggered = false;
+      document.getElementById('sliderThrottle').value = 98;
+      document.getElementById('sliderCohesion').value = 0.15;
+      document.getElementById('sliderGrain').value = 35;
+      document.getElementById('sliderAlt').value = 4.2;
+    }
+
+    function triggerAutoCutoff() {
+      landerState.autoCutoffTriggered = true;
+      landerState.autoDescentActive = false;
+      landerState.vz = 0;
+      landerState.throttle = 0.0;
+      landerState.stagnationP = 0.0;
+      landerState.thrust = 0.0;
+      landerState.sandblastEnergy = 0.0;
+      landerState.ejectaFlux = 0.0;
+      document.getElementById('txtAutoDescent').innerText = "Run Automated Descent";
+      document.getElementById('recoveryBanner').classList.remove('hidden');
+    }
+
+    function resetSimulation() {
+      landerState.altitude = 14.0;
+      landerState.vz = -1.1;
+      landerState.throttle = 0.75;
+      landerState.cohesion = 0.8;
+      landerState.d50 = 72;
+      landerState.craterDepth = 0.18;
+      landerState.craterRadius = 1.4;
+      landerState.autoDescentActive = false;
+      landerState.autoCutoffTriggered = false;
+      document.getElementById('sliderAlt').value = 14.0;
+      document.getElementById('sliderThrottle').value = 75;
+      document.getElementById('sliderCohesion').value = 0.8;
+      document.getElementById('sliderGrain').value = 72;
+      document.getElementById('txtAutoDescent').innerText = "Run Automated Descent";
+      document.getElementById('recoveryBanner').classList.add('hidden');
+      initParticles();
+    }
+
+    // =========================================================================
+    // WINDOW ONLOAD ORCHESTRATION
+    // =========================================================================
+    window.onload = function() {
+      // Render Lucide SVG Icons
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+
+      // Initialize Canvas Dimensions & Particles
+      resizeCanvas();
+      initParticles();
+
+      // Initialize Charts
+      initCharts();
+
+      // Start Physics Interval Loop (25 Hz)
+      setInterval(stepPhysics, 40);
+
+      // Start Animation Loop for 60fps Canvas
+      function animLoop() {
+        renderCanvas();
+        requestAnimationFrame(animLoop);
+      }
+      animLoop();
+    };
+  </script>
+</body>
+</html>
